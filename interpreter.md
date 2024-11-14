@@ -67,6 +67,7 @@ class Rect {
 
 # resources
 
-[crafting interpreters](https://craftinginterpreters.com)
-[writing an interpreter in go](https://interpreterbook.com)
+- [crafting interpreters](https://craftinginterpreters.com)
+- [writing an interpreter in go](https://interpreterbook.com)
+
 
