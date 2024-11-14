@@ -32,8 +32,21 @@ struct Token {
         case Comma = ","
         case Bang = "!"
         case BangEqual = "!="
-        case Number
+        case Integer
+        case Float
+        case String
         case Identifier
+        case Let
+        case If
+        case Else
+        case For
+        case While
+        case Fun
+        case Return
+        case Class
+        case True
+        case False
+        case Newline
         case Eof
     }
 }

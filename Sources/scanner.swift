@@ -9,10 +9,12 @@ import Foundation
 
 enum ScannerError: Error {
     case invalidCharacter
+    case unterminatedString
 }
 
 class Scanner {
     let source: String
+    var start: String.Index
     var position: String.Index
     var line: Int = 1
     var tokens: [Token] = []
@@ -21,9 +23,22 @@ class Scanner {
         guard !isAtEnd else { return "\0" }
         return source[position]
     }
+    let keywords: [String: Token.TokenType] = [
+        "let": .Let,
+        "if": .If,
+        "else": .Else,
+        "while": .While,
+        "true": .True,
+        "false": .False,
+        "class": .Class,
+        "fun": .Fun,
+        "return": .Return,
+        "for": .For
+    ]
     
     init(source: String) {
         self.source = source
+        start = source.startIndex
         position = source.startIndex
     }
     
@@ -35,6 +50,7 @@ class Scanner {
     }
     
     func scanToken() throws {
+        start = position
         let c = advance()
         
         switch c {
@@ -46,7 +62,7 @@ class Scanner {
         case "/":
             if peek == "/" {
                 addToken(type: .SlashSlash)
-                while peek != "\n" {
+                while peek != "\n" && !isAtEnd {
                     advance()
                 }
             } else {
@@ -86,9 +102,19 @@ class Scanner {
             } else {
                 addToken(type: .Bang)
             }
+        case "\"": try string()
         case " ", "\r", "\t": break
-        case "\n": line += 1
-        default: throw ScannerError.invalidCharacter
+        case "\n":
+            line += 1
+            addToken(type: .Newline)
+        default:
+            if isAlpha(c) {
+                identifier()
+            } else if isDigit(c) {
+                number()
+            } else {
+                throw ScannerError.invalidCharacter
+            }
         }
     }
     
@@ -102,6 +128,72 @@ class Scanner {
     
     func addToken(type: Token.TokenType) {
         let token = Token(type: type, lexeme: type.rawValue, line: line)
+        tokens.append(token)
+    }
+    
+    func isAlpha(_ c: Character) -> Bool {
+        return c.isLetter || c == "_"
+    }
+    
+    func isDigit(_ c: Character) -> Bool {
+        return c.isNumber
+    }
+    
+    func isAlphaNumeric(_ c: Character) -> Bool {
+        return isAlpha(c) || isDigit(c)
+    }
+    
+    func identifier() {
+        while isAlphaNumeric(peek) && !isAtEnd {
+            advance()
+        }
+        
+        let identifier = String(source[start..<position])
+        if let tokenType = keywords[identifier] {
+            let token = Token(type: tokenType, lexeme: identifier, line: line)
+            tokens.append(token)
+        } else {
+            let token = Token(type: .Identifier, lexeme: identifier, line: line)
+            tokens.append(token)
+        }
+    }
+    
+    func number() {
+        while isDigit(peek) && !isAtEnd {
+            advance()
+        }
+        if peek == "." {
+            advance()
+            while isDigit(peek) && !isAtEnd {
+                advance()
+            }
+        }
+        
+        let number = String(source[start..<position])
+        if number.contains(".") {
+            let token = Token(type: .Float, lexeme: number, line: line)
+            tokens.append(token)
+        } else {
+            let token = Token(type: .Integer, lexeme: number, line: line)
+            tokens.append(token)
+        }
+    }
+    
+    func string() throws {
+        while peek != "\"" && !isAtEnd {
+            if peek == "\n" {
+                line += 1
+            }
+            advance()
+        }
+        
+        if isAtEnd {
+            throw ScannerError.unterminatedString
+        }
+        advance()
+        
+        let string = String(source[source.index(after: start)..<source.index(before: position)])
+        let token = Token(type: .String, lexeme: string, line: line)
         tokens.append(token)
     }
 }
