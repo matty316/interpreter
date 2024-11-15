@@ -65,6 +65,23 @@ class Rect {
 
 ---
 
+# the scanner
+
+- the scanner's job is to turn a source code file into a list of tokens
+- a token represents something that the launguange needs to know about 
+    - a semicolon, a number, a word, etc 
+- we take those tokens and pass the to...
+
+---
+
+# the parser
+
+- the parser's job is to take the tokens and create a structure to respresent the code
+- we will be building a recursive descent parser
+- this will loop thru our tokens and call functions recursively based on the precedence of the diff statements and expressions in our language
+- it will build our *abstract syntax tree* by returning objects from those functions 
+
+---
 # resources
 
 - [crafting interpreters](https://craftinginterpreters.com)

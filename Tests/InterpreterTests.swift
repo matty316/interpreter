@@ -115,4 +115,76 @@ struct InterpreterTests {
             #expect(t.type == tokenType)
         }
     }
+    
+    @Test func parseUnary() async throws {
+        let source = "-1"
+        let scanner = Scanner(source: source)
+        try scanner.scan()
+        let parser = Parser(tokens: scanner.tokens)
+        let program = try parser.parse()
+        #expect(program.stmts.count == 1)
+        guard let stmt = program.stmts.first as? Expression, let expr = stmt.expr as? Unary else {
+            #expect(Bool(false))
+            return
+        }
+        
+        #expect(expr.op.type == .Minus)
+        guard let right = expr.right as? Integer else {
+            #expect(Bool(false))
+            return
+        }
+        #expect(right.value == 1)
+    }
+    
+    @Test func parseBinary() async throws {
+        let source = """
+1 + 2
+10 >= 3; 5 + 7
+
+"""
+        
+        let scanner = Scanner(source: source)
+        try scanner.scan()
+        let parser = Parser(tokens: scanner.tokens)
+        let program = try parser.parse()
+        
+        let expectedExpr: [Binary] = [
+            Binary(left: Integer(value: 1), right: Integer(value: 2), op: Token(type: .Plus, lexeme: "+", line: 1)),
+            Binary(left: Integer(value: 10), right: Integer(value: 3), op: Token(type: .GreaterThanEqual, lexeme: ">=", line: 2)),
+            Binary(left: Integer(value: 5), right: Integer(value: 7), op: Token(type: .Plus, lexeme: "+", line: 2)),
+        ]
+        
+        #expect(program.stmts.count == 3)
+        for (i, expr) in expectedExpr.enumerated() {
+            let testStmt = program.stmts[i]
+            guard let testStmt = testStmt as? Expression, let testExpr = testStmt.expr as? Binary else {
+                #expect(Bool(false))
+                return
+            }
+            
+            #expect(testExpr.op.type == expr.op.type)
+            guard let left = testExpr.left as? Integer, let right = testExpr.right as? Integer else {
+                #expect(Bool(false))
+                return
+            }
+            
+            let expectedLeft = expr.left as! Integer
+            let expectedRight = expr.right as! Integer
+            
+            #expect(left.value == expectedLeft.value)
+            #expect(right.value == expectedRight.value)
+        }
+        guard let stmt = program.stmts.first as? Expression, let expr = stmt.expr as? Binary else {
+            #expect(Bool(false))
+            return
+        }
+        #expect(expr.op.type == .Plus)
+        guard let left = expr.left as? Integer, let right = expr.right as? Integer else {
+            #expect(Bool(false))
+            return
+        }
+        
+        #expect(left.value == 1)
+        #expect(right.value == 2)
+    }
 }
