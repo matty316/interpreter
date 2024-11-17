@@ -33,7 +33,8 @@ class Scanner {
         "class": .Class,
         "fun": .Fun,
         "return": .Return,
-        "for": .For
+        "for": .For,
+        "null": .Null
     ]
     
     init(source: String) {

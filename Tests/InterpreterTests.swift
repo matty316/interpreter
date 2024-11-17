@@ -9,6 +9,10 @@ import Testing
 @testable import interpreter
 
 struct InterpreterTests {
+    
+    func getToken(TokenType: Token.TokenType, line: Int) -> Token {
+        return Token(type: TokenType, lexeme: TokenType.rawValue, line: line)
+    }
 
     @Test func scanSingleToken() async throws {
         // Write your test here and use APIs like `#expect(...)` to check expected conditions.
@@ -140,7 +144,10 @@ struct InterpreterTests {
         let source = """
 1 + 2
 10 >= 3; 5 + 7
-
+10 / 5
+10 * 5
+(10 + 5) * 7
+10 + 5 * 7
 """
         
         let scanner = Scanner(source: source)
@@ -152,9 +159,13 @@ struct InterpreterTests {
             Binary(left: Integer(value: 1), right: Integer(value: 2), op: Token(type: .Plus, lexeme: "+", line: 1)),
             Binary(left: Integer(value: 10), right: Integer(value: 3), op: Token(type: .GreaterThanEqual, lexeme: ">=", line: 2)),
             Binary(left: Integer(value: 5), right: Integer(value: 7), op: Token(type: .Plus, lexeme: "+", line: 2)),
+            Binary(left: Integer(value: 10), right: Integer(value: 5), op: Token(type: .Slash, lexeme: "/", line: 3)),
+            Binary(left: Integer(value: 10), right: Integer(value: 5), op: Token(type: .Star, lexeme: "*", line: 4)),
+            Binary(left: Binary(left: Integer(value: 10), right: Integer(value: 5), op: getToken(TokenType: .Plus, line: 5)), right: Integer(value: 7), op: getToken(TokenType: .Star, line: 5)),
+            Binary(left: Integer(value: 10), right: Binary(left: Integer(value: 5), right: Integer(value: 7), op: getToken(TokenType: .Star, line: 5)), op: getToken(TokenType: .Plus, line: 5)),
         ]
         
-        #expect(program.stmts.count == 3)
+        #expect(program.stmts.count == 7)
         for (i, expr) in expectedExpr.enumerated() {
             let testStmt = program.stmts[i]
             guard let testStmt = testStmt as? Expression, let testExpr = testStmt.expr as? Binary else {
@@ -163,16 +174,35 @@ struct InterpreterTests {
             }
             
             #expect(testExpr.op.type == expr.op.type)
-            guard let left = testExpr.left as? Integer, let right = testExpr.right as? Integer else {
-                #expect(Bool(false))
-                return
+            
+            if let left = testExpr.left as? Integer, let expectedLeft = expr.left as? Integer {
+                #expect(left.value == expectedLeft.value)
             }
             
-            let expectedLeft = expr.left as! Integer
-            let expectedRight = expr.right as! Integer
+            if let right = testExpr.right as? Integer, let expectedRight = expr.right as? Integer {
+                #expect(right.value == expectedRight.value)
+            }
             
-            #expect(left.value == expectedLeft.value)
-            #expect(right.value == expectedRight.value)
+            if let left = testExpr.left as? Binary, let expectedLeft = expr.left as? Binary {
+                let leftVal = left.left as! Integer
+                let expectedLeftVal = left.left as! Integer
+                let rightVal = left.right as! Integer
+                let expectedRightVal = left.right as! Integer
+                #expect(left.op.type == expectedLeft.op.type)
+                #expect(leftVal.value == expectedLeftVal.value)
+                #expect(rightVal.value == expectedRightVal.value)
+            }
+            
+            if let right = testExpr.right as? Binary, let expectedRight = expr.right as? Binary {
+                let leftVal = right.left as! Integer
+                let expectedLeftVal = right.left as! Integer
+                let rightVal = right.right as! Integer
+                let expectedRightVal = right.right as! Integer
+                #expect(right.op.type == expectedRight.op.type)
+                #expect(leftVal.value == expectedLeftVal.value)
+                #expect(rightVal.value == expectedRightVal.value)
+            }
+            
         }
         guard let stmt = program.stmts.first as? Expression, let expr = stmt.expr as? Binary else {
             #expect(Bool(false))
@@ -186,5 +216,60 @@ struct InterpreterTests {
         
         #expect(left.value == 1)
         #expect(right.value == 2)
+    }
+    
+    @Test func parseLiteral() async throws {
+        let source = """
+1
+1.3
+true
+false
+null
+"hell yeah"
+"""
+        let scanner = Scanner(source: source)
+        try scanner.scan()
+        let parser = Parser(tokens: scanner.tokens)
+        let program = try parser.parse()
+        
+        let expected: [Expr] = [
+            Integer(value: 1),
+            Float(value: 1.3),
+            Boolean(value: true),
+            Boolean(value: false),
+            Null(),
+            StringVal(value: "hell yeah"),
+        ]
+        
+        #expect(program.stmts.count == 6)
+        
+        for (i, expr) in expected.enumerated() {
+            let stmt = program.stmts[i] as! Expression
+            let testExpr = stmt.expr
+            
+            if let expr = expr as? Integer {
+                let int = testExpr as! Integer
+                #expect(expr.value == int.value)
+            }
+            
+            if let expr = expr as? Float {
+                let float = testExpr as! Float
+                #expect(expr.value == float.value)
+            }
+            
+            if let expr = expr as? StringVal {
+                let string = testExpr as! StringVal
+                #expect(expr.value == string.value)
+            }
+            
+            if let expr = expr as? Boolean {
+                let bool = testExpr as! Boolean
+                #expect(expr.value == bool.value)
+            }
+            
+            if expr is Null {
+                #expect(testExpr is Null)
+            }
+        }
     }
 }

@@ -6,7 +6,7 @@
 //
 
 enum ParserError: Error {
-    case invalidToken
+    case invalidToken(Token)
 }
 
 class Parser {
@@ -48,24 +48,36 @@ class Parser {
     }
     
     func comparison() throws -> Expr {
-        let left = try term()
+        var left = try term()
         
         while match(types: [.LessThan, .LessThanEqual, .GreaterThan, .GreaterThanEqual]) {
             let op = prev
             let right = try term()
-            return Binary(left: left, right: right, op: op)
+            left = Binary(left: left, right: right, op: op)
         }
         
         return left
     }
     
     func term() throws -> Expr {
-        let left = try unary()
+        var left = try factor()
         
         while match(types: [.Plus, .Minus]) {
             let op = prev
+            let right = try factor()
+            left = Binary(left: left, right: right, op: op)
+        }
+        
+        return left
+    }
+    
+    func factor() throws -> Expr {
+        var left = try unary()
+        
+        while match(types: [.Star, .Slash]) {
+            let op = prev
             let right = try unary()
-            return Binary(left: left, right: right, op: op)
+            left = Binary(left: left, right: right, op: op)
         }
         
         return left
@@ -82,12 +94,37 @@ class Parser {
     }
     
     func primary() throws -> Expr {
+        if match(types: [.True]) {
+            return Boolean(value: true)
+        }
+        if match(types: [.False]) {
+            return Boolean(value: false)
+        }
+        if match(types: [.Null]) {
+            return Null()
+        }
+        if match(types: [.String]) {
+            return StringVal(value: prev.lexeme)
+        }
+        if match(types: [.Float]) {
+            let token = prev
+            guard let value = Double(token.lexeme) else {
+                throw ParserError.invalidToken(prev)
+            }
+            return Float(value: value)
+        }
         if match(types: [.Integer]) {
             let token = prev
             guard let value = Int(token.lexeme) else {
-                throw ParserError.invalidToken
+                throw ParserError.invalidToken(prev)
             }
             return Integer(value: Int(value))
+        }
+        
+        if match(types: [.LeftParen]) {
+            let expr = try expression()
+            try consume(tokenType: .RightParen)
+            return expr
         }
         return try expression()
     }
@@ -115,7 +152,9 @@ class Parser {
     
     @discardableResult
     func consume(tokenType: Token.TokenType) throws -> Token {
-        if check(tokenType: tokenType) { advance() }
-        throw ParserError.invalidToken
+        guard check(tokenType: tokenType) else {
+            throw ParserError.invalidToken(peek)
+        }
+        return advance()
     }
 }

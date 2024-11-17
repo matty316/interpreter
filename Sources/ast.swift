@@ -42,3 +42,16 @@ struct Integer: Expr {
     let value: Int
 }
 
+struct Boolean: Expr {
+    let value: Bool
+}
+
+struct StringVal: Expr {
+    let value: String
+}
+
+struct Float: Expr {
+    let value: Double
+}
+
+struct Null: Expr {}

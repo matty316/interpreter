@@ -46,6 +46,7 @@ struct Token {
         case Class
         case True
         case False
+        case Null
         case Newline
         case Eof
     }
