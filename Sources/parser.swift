@@ -50,7 +50,7 @@ class Parser {
     func comparison() throws -> Expr {
         var left = try term()
         
-        while match(types: [.LessThan, .LessThanEqual, .GreaterThan, .GreaterThanEqual]) {
+        while match(types: [.LessThan, .LessThanEqual, .GreaterThan, .GreaterThanEqual, .EqualEqual, .BangEqual]) {
             let op = prev
             let right = try term()
             left = Binary(left: left, right: right, op: op)
@@ -111,7 +111,7 @@ class Parser {
             guard let value = Double(token.lexeme) else {
                 throw ParserError.invalidToken(prev)
             }
-            return Float(value: value)
+            return FloatVal(value: value)
         }
         if match(types: [.Integer]) {
             let token = prev
@@ -126,7 +126,7 @@ class Parser {
             try consume(tokenType: .RightParen)
             return expr
         }
-        return try expression()
+        throw ParserError.invalidToken(peek)
     }
     
     @discardableResult

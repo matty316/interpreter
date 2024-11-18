@@ -50,7 +50,7 @@ struct StringVal: Expr {
     let value: String
 }
 
-struct Float: Expr {
+struct FloatVal: Expr {
     let value: Double
 }
 

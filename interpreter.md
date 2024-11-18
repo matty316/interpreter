@@ -82,6 +82,52 @@ class Rect {
 - it will build our *abstract syntax tree* by returning objects from those functions 
 
 ---
+
+# the evaluator
+
+- this is the last piece of our interpreter 
+    - kind of. you can add a million different steps if you want (i.e. optimization)
+- this step's job is to evaluate the expressions and statements we parsed
+- we will start by parsing expressions and then statements
+- we must also decide how to respresent the values in our language
+
+| Our Interpreter | Swift  |
+| --------------- | -----  |
+| AnyValue        | Any    |
+| Null            | Nil    |
+| Boolean         | Bool   |
+| Integer         | Int    |
+| Float           | Double |
+| String          | String |
+
+---
+
+# example eval code
+
+```swift
+func evalExpr(_ expr: Expr) -> Any {
+    if expr is Binary {
+        return evalBinary(expr)
+    } else if let expr = expr as? Integer {
+        return expr.value
+    }
+}
+
+func evalBinary(_ expr: Expr) -> Any {
+    let left = evalExpr(expr.left)
+    let right = evalExpr(expr.right)
+    switch expr.op.type {
+        case .plus:
+            if let left = left as? Int, let right = right as? Int {
+                return left + right
+            }
+        default: throw Error
+    }
+}
+
+```
+
+---
 # resources
 
 - [crafting interpreters](https://craftinginterpreters.com)
