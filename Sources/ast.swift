@@ -22,6 +22,15 @@ struct Expression: Stmt {
     let expr: Expr
 }
 
+struct VarStmt: Stmt {
+    let name: String
+    let initializer: Expr?
+}
+
+struct Block: Stmt {
+    let stmts: [Stmt]
+}
+
 struct Assignment: Expr {
     let name: Token
     let value: Expr
@@ -55,3 +64,12 @@ struct FloatVal: Expr {
 }
 
 struct Null: Expr {}
+
+struct Var: Expr {
+    let name: String
+}
+
+struct Assign: Expr {
+    let name: String
+    let value: Expr
+}

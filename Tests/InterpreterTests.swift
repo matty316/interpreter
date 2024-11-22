@@ -290,7 +290,6 @@ null
         if let answer = answer as? Int {
             #expect(answer == exp.answer)
         }
-        
     }
     
     @Test(arguments: [
@@ -308,7 +307,6 @@ null
         if let answer = answer as? Double {
             #expect(answer == exp.answer)
         }
-        
     }
     
     @Test(arguments: [
@@ -340,7 +338,6 @@ null
         if let answer = answer as? Bool{
             #expect(answer == exp.answer)
         }
-        
     }
     
     @Test(arguments: [
@@ -356,6 +353,60 @@ null
         if let answer = answer as? String {
             #expect(answer == exp.answer)
         }
+    }
+    
+    @Test(arguments: [
+        ("let variable = 1\nvariable", 1),
+        ("let variable = 1; variable = 2; variable", 2)
+    ])
+    func globalVars(exp: (source: String, answer: Int)) async throws {
+        let scanner = Scanner(source: exp.source)
+        try scanner.scan()
+        let parser = Parser(tokens: scanner.tokens)
+        let program = try parser.parse()
+        let eval = Evaluator(program: program)
+        let answer = try eval.eval()
+        if let answer = answer as? Int {
+            #expect(answer == exp.answer)
+        }
+    }
+    
+    @Test(arguments: zip(["let variable = 2; variable = 3"], [(3, "variable")]))
+    func parseAssign(source: String, exp: (val: Int, name: String)) async throws {
+        let scanner = Scanner(source: source)
+        try scanner.scan()
+        let parser = Parser(tokens: scanner.tokens)
+        let program = try parser.parse()
+        guard let exprStmt = program.stmts.last as? Expression, let assign = exprStmt.expr as? Assign else {
+            return
+        }
         
+        #expect(assign.name == exp.name)
+        #expect((assign.value as! Integer).value == exp.val)
+    }
+    
+    @Test func block() async throws {
+        let source = """
+let var1 = "global 1"
+let var2 = "global 2"
+let var3 = "global 3"
+
+{
+    let var1 = "local 1"
+    let var2 = "local 2"
+    let var3 = "local 3"
+}
+
+var1
+"""
+        
+        let scanner = Scanner(source: source)
+        try scanner.scan()
+        let parser = Parser(tokens: scanner.tokens)
+        let program = try parser.parse()
+        let eval = Evaluator(program: program)
+        let answer = try eval.eval()
+        
+        #expect(answer as! String == "global 1")
     }
 }

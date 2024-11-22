@@ -7,6 +7,7 @@
 
 enum ParserError: Error {
     case invalidToken(Token)
+    case invalidAssignment(Token)
 }
 
 class Parser {
@@ -24,7 +25,7 @@ class Parser {
         var stmts = [Stmt]()
         
         while !isAtEnd {
-            if let stmt = try parseStmt() {
+            if let stmt = try declaration() {
                 stmts.append(stmt)
             }
         }
@@ -32,9 +33,39 @@ class Parser {
         return Program(stmts: stmts)
     }
     
-    func parseStmt() throws -> Stmt? {
-        if match(types: [.Eof, .Newline, .Semicolon]) { return nil }
+    func declaration() throws -> Stmt? {
+        if match(types: [.Let]) { return try varDeclaration() }
+        if match(types: [.Newline, .Eof, .Semicolon]) { return nil }
+        return try stmt()
+    }
+    
+    func varDeclaration() throws -> Stmt? {
+        let name = try consume(tokenType: .Identifier)
+        var initializer: Expr? = nil
+        
+        if match(types: [.Equal]) {
+            initializer = try expression()
+        }
+        
+        return VarStmt(name: name.lexeme, initializer: initializer)
+    }
+    
+    func stmt() throws -> Stmt? {
+        if match(types: [.LeftBrace]) { return try parseBlock() }
         return try expressionStmt()
+    }
+    
+    func parseBlock() throws -> Stmt? {
+        var stmts = [Stmt]()
+        
+        while !check(tokenType: .RightBrace) && !isAtEnd {
+            if let stmt = try declaration() {
+                stmts.append(stmt)
+            }
+        }
+        
+        try consume(tokenType: .RightBrace)
+        return Block(stmts: stmts)
     }
     
     func expressionStmt() throws -> Stmt {
@@ -43,7 +74,24 @@ class Parser {
     }
     
     func expression() throws -> Expr {
+        return try assignment()
+    }
+    
+    func assignment() throws -> Expr {
         let expr = try comparison()
+        
+        if match(types: [.Equal]) {
+            let equals = prev
+            let value = try assignment()
+            
+            if let expr = expr as? Var {
+                let name = expr.name
+                return Assign(name: name, value: value)
+            }
+            
+            throw ParserError.invalidAssignment(equals)
+        }
+        
         return expr
     }
     
@@ -119,6 +167,10 @@ class Parser {
                 throw ParserError.invalidToken(prev)
             }
             return Integer(value: Int(value))
+        }
+        
+        if match(types: [.Identifier]) {
+            return Var(name: prev.lexeme)
         }
         
         if match(types: [.LeftParen]) {

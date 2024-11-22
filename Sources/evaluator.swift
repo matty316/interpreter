@@ -12,6 +12,7 @@ enum RuntimeError: Error {
 
 class Evaluator {
     let program: Program
+    var env = Env()
     
     init(program: Program) {
         self.program = program
@@ -28,6 +29,8 @@ class Evaluator {
     func evalStmt(_ stmt: Stmt) throws -> Any? {
         switch stmt {
         case let stmt as Expression: return try evalExpession(stmt)
+        case let stmt as VarStmt: return try evalVarStmt(stmt)
+        case let stmt as Block: return try evalBlock(stmt, environment: Env(enclosing: env))
         default: throw RuntimeError.General
         }
     }
@@ -35,6 +38,27 @@ class Evaluator {
     func evalExpession(_ stmt: Expression) throws -> Any? {
         let expr = stmt.expr
         return try evalExpr(expr)
+    }
+    
+    func evalBlock(_ stmt: Block, environment: Env) throws -> Any? {
+        let prev = env
+        env = environment
+        for stmt in stmt.stmts {
+            _ = try evalStmt(stmt)
+        }
+        env = prev
+        return nil
+    }
+    
+    func evalVarStmt(_ stmt: VarStmt) throws -> Any? {
+        var value: Any? = nil
+        
+        if let initializer = stmt.initializer {
+            value = try evalExpr(initializer)
+        }
+        
+        env.define(name: stmt.name, value: value)
+        return nil
     }
     
     func evalExpr(_ expr: Expr) throws -> Any? {
@@ -45,9 +69,17 @@ class Evaluator {
         case let boolean as Boolean: return boolean.value
         case let string as StringVal: return string.value
         case let float as FloatVal: return float.value
+        case let variable as Var: return try env.get(name: variable.name)
+        case let assign as Assign: return try evalAssign(assign)
         case is Null: return nil
         default: throw RuntimeError.General
         }
+    }
+    
+    func evalAssign(_ expr: Assign) throws -> Any? {
+        let value = try evalExpr(expr.value)
+        try env.assign(name: expr.name, value: value)
+        return value
     }
     
     func evalBinary(_ expr: Binary) throws -> Any {
