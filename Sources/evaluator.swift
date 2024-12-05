@@ -8,6 +8,7 @@
 enum RuntimeError: Error {
     case General
     case Unimplemented
+    case InvalidOperand
 }
 
 class Evaluator {
@@ -28,14 +29,30 @@ class Evaluator {
     
     func evalStmt(_ stmt: Stmt) throws -> Any? {
         switch stmt {
-        case let stmt as Expression: return try evalExpession(stmt)
-        case let stmt as VarStmt: return try evalVarStmt(stmt)
+        case let stmt as ExpressionStmt: return try evalExpession(stmt)
+        case let stmt as LetStmt: return try evalLetStmt(stmt)
         case let stmt as Block: return try evalBlock(stmt, environment: Env(enclosing: env))
         default: throw RuntimeError.General
         }
     }
     
-    func evalExpession(_ stmt: Expression) throws -> Any? {
+    func evalIf(_ expr: IfExpr) throws -> Any? {
+        if (try isTruthy(expr.condition)) {
+            return try evalStmt(expr.thenBranch)
+        } else if let elseBranch = expr.elseBranch {
+            return try evalStmt(elseBranch)
+        }
+        return nil
+    }
+    
+    func isTruthy(_ expr: Expr) throws -> Bool {
+        guard let truthy = try evalExpr(expr) as? Bool else {
+            throw RuntimeError.InvalidOperand
+        }
+        return truthy
+    }
+    
+    func evalExpession(_ stmt: ExpressionStmt) throws -> Any? {
         let expr = stmt.expr
         return try evalExpr(expr)
     }
@@ -50,7 +67,7 @@ class Evaluator {
         return nil
     }
     
-    func evalVarStmt(_ stmt: VarStmt) throws -> Any? {
+    func evalLetStmt(_ stmt: LetStmt) throws -> Any? {
         var value: Any? = nil
         
         if let initializer = stmt.initializer {
@@ -69,8 +86,9 @@ class Evaluator {
         case let boolean as Boolean: return boolean.value
         case let string as StringVal: return string.value
         case let float as FloatVal: return float.value
-        case let variable as Var: return try env.get(name: variable.name)
+        case let variable as Identifier: return try env.get(name: variable.name)
         case let assign as Assign: return try evalAssign(assign)
+        case let ifExpr as IfExpr: return try evalIf(ifExpr)
         case is Null: return nil
         default: throw RuntimeError.General
         }
@@ -87,7 +105,7 @@ class Evaluator {
         let left = try evalExpr(expr.left)
         let right = try evalExpr(expr.right)
         
-        switch op.type {
+        switch op.tokenType {
         case .Plus:
             if let left = left as? Int, let right = right as? Int {
                 return left + right
@@ -207,7 +225,7 @@ class Evaluator {
         let op = expr.op
         let right = try evalExpr(expr.right)
         
-        switch op.type {
+        switch op.tokenType {
         case .Bang:
             if let right = right as? Bool {
                 return !right

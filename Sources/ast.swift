@@ -18,11 +18,17 @@ struct Function: Stmt {
     let body: [Stmt]
 }
 
-struct Expression: Stmt {
+struct IfExpr: Expr {
+    let condition: Expr
+    let thenBranch: Block
+    let elseBranch: Block?
+}
+
+struct ExpressionStmt: Stmt {
     let expr: Expr
 }
 
-struct VarStmt: Stmt {
+struct LetStmt: Stmt {
     let name: String
     let initializer: Expr?
 }
@@ -65,7 +71,7 @@ struct FloatVal: Expr {
 
 struct Null: Expr {}
 
-struct Var: Expr {
+struct Identifier: Expr {
     let name: String
 }
 

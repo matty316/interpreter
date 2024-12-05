@@ -23,7 +23,7 @@ class Scanner {
         guard !isAtEnd else { return "\0" }
         return source[position]
     }
-    let keywords: [String: Token.TokenType] = [
+    let keywords: [String: TokenType] = [
         "let": .Let,
         "if": .If,
         "else": .Else,
@@ -127,7 +127,7 @@ class Scanner {
         return char
     }
     
-    func addToken(type: Token.TokenType) {
+    func addToken(type: TokenType) {
         let token = Token(type: type, lexeme: type.rawValue, line: line)
         tokens.append(token)
     }

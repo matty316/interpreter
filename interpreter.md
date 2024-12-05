@@ -116,7 +116,7 @@ func evalExpr(_ expr: Expr) -> Any {
 func evalBinary(_ expr: Expr) -> Any {
     let left = evalExpr(expr.left)
     let right = evalExpr(expr.right)
-    switch expr.op.type {
+    switch expr.op.tokenType {
         case .plus:
             if let left = left as? Int, let right = right as? Int {
                 return left + right

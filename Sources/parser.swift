@@ -8,6 +8,36 @@
 enum ParserError: Error {
     case invalidToken(Token)
     case invalidAssignment(Token)
+    case ifWithNoThenBranch
+    case noPrefixParseFn(Token)
+    case noInfixParseFn(Token)
+}
+
+typealias PrefixParseFn = () throws -> Expr
+typealias InfixParseFn = (Expr) throws -> Expr
+
+enum Precedence: Int {
+    case lowest = 0
+    case equals = 1
+    case lessGreater = 2
+    case sum = 3
+    case product = 4
+    case prefix = 5
+    case call = 6
+    case index = 7
+}
+
+extension TokenType {
+    var precedence: Precedence {
+        switch self {
+        case .EqualEqual, .BangEqual: return .equals
+        case .LessThan, .GreaterThan, .LessThanEqual, .GreaterThanEqual: return .lessGreater
+        case .Plus, .Minus: return .sum
+        case .Star, .Slash: return .product
+        case .LeftParen: return .call
+        default: return .lowest
+        }
+    }
 }
 
 class Parser {
@@ -15,17 +45,43 @@ class Parser {
     var position = 0
     var peek: Token { tokens[position] }
     var prev: Token { tokens[position - 1] }
-    var isAtEnd: Bool { peek.type == .Eof }
+    var isAtEnd: Bool { peek.tokenType == .Eof }
+    
+    var prefixParseFns = [TokenType: PrefixParseFn]()
+    var infixParseFns = [TokenType: InfixParseFn]()
     
     init(tokens: [Token]) {
         self.tokens = tokens
-    }
+        
+        self.prefixParseFns[.Identifier] = parseIdent
+        self.prefixParseFns[.Integer] = parseInt
+        self.prefixParseFns[.Float] = parseFloat
+        self.prefixParseFns[.String] = parseString
+        self.prefixParseFns[.True] = parseBoolean
+        self.prefixParseFns[.False] = parseBoolean
+        self.prefixParseFns[.Minus] = parsePrefix
+        self.prefixParseFns[.Bang] = parsePrefix
+        self.prefixParseFns[.LeftParen] = parseGrouping
+        self.prefixParseFns[.If] = parseIf
+        
+        self.infixParseFns[.Plus] = parseInfix
+        self.infixParseFns[.Minus] = parseInfix
+        self.infixParseFns[.Star] = parseInfix
+        self.infixParseFns[.Slash] = parseInfix
+        self.infixParseFns[.LessThan] = parseInfix
+        self.infixParseFns[.LessThanEqual] = parseInfix
+        self.infixParseFns[.GreaterThan] = parseInfix
+        self.infixParseFns[.GreaterThanEqual] = parseInfix
+        self.infixParseFns[.BangEqual] = parseInfix
+        self.infixParseFns[.EqualEqual] = parseInfix
+        self.infixParseFns[.Equal] = parseAssign
+}
     
     func parse() throws -> Program {
         var stmts = [Stmt]()
         
         while !isAtEnd {
-            if let stmt = try declaration() {
+            if let stmt = try parseStmt() {
                 stmts.append(stmt)
             }
         }
@@ -33,33 +89,29 @@ class Parser {
         return Program(stmts: stmts)
     }
     
-    func declaration() throws -> Stmt? {
-        if match(types: [.Let]) { return try varDeclaration() }
-        if match(types: [.Newline, .Eof, .Semicolon]) { return nil }
-        return try stmt()
+    func parseStmt() throws -> Stmt? {
+        if match(types: [.Let]) { return try parseLet() }
+        if match(types: [.Newline, .Semicolon]) { return nil }
+        return try parseExpressionStmt()
     }
     
-    func varDeclaration() throws -> Stmt? {
+    func parseLet() throws -> Stmt? {
         let name = try consume(tokenType: .Identifier)
         var initializer: Expr? = nil
         
         if match(types: [.Equal]) {
-            initializer = try expression()
+            initializer = try parseExpr(.lowest)
         }
         
-        return VarStmt(name: name.lexeme, initializer: initializer)
+        return LetStmt(name: name.lexeme, initializer: initializer)
     }
     
-    func stmt() throws -> Stmt? {
-        if match(types: [.LeftBrace]) { return try parseBlock() }
-        return try expressionStmt()
-    }
-    
-    func parseBlock() throws -> Stmt? {
+    func parseBlock() throws -> Block {
         var stmts = [Stmt]()
+        try consume(tokenType: .LeftBrace)
         
         while !check(tokenType: .RightBrace) && !isAtEnd {
-            if let stmt = try declaration() {
+            if let stmt = try parseStmt() {
                 stmts.append(stmt)
             }
         }
@@ -68,117 +120,100 @@ class Parser {
         return Block(stmts: stmts)
     }
     
-    func expressionStmt() throws -> Stmt {
-        let expr = try expression()
-        return Expression(expr: expr)
+    func parseExpressionStmt() throws -> Stmt {
+        let expr = try parseExpr(.lowest)
+        if check(tokenType: .Newline) || check(tokenType: .Semicolon) {
+            advance()
+        }
+        return ExpressionStmt(expr: expr)
     }
     
-    func expression() throws -> Expr {
-        return try assignment()
-    }
-    
-    func assignment() throws -> Expr {
-        let expr = try comparison()
-        
-        if match(types: [.Equal]) {
-            let equals = prev
-            let value = try assignment()
-            
-            if let expr = expr as? Var {
-                let name = expr.name
-                return Assign(name: name, value: value)
-            }
-            
-            throw ParserError.invalidAssignment(equals)
+    func parseExpr(_ precedence: Precedence) throws -> Expr {
+        guard let prefix = prefixParseFns[peek.tokenType] else {
+            throw ParserError.noPrefixParseFn(peek)
         }
         
+        var left = try prefix()
+        advance()
+        
+        while !check(tokenType: .Newline) || !check(tokenType: .Semicolon) || !check(tokenType: .Eof) && precedence.rawValue < peek.tokenType.precedence.rawValue {
+            guard let infix = infixParseFns[peek.tokenType] else {
+                return left
+            }
+            
+            advance()
+            left = try infix(left)
+        }
+        
+        return left
+    }
+    
+    func parseIdent() -> Expr {
+        return Identifier(name: peek.lexeme)
+    }
+    
+    func parseInt() throws -> Expr {
+        guard let num = Int(peek.lexeme) else {
+            throw ParserError.invalidToken(peek)
+        }
+        return Integer(value: num)
+    }
+    
+    func parseFloat() throws -> Expr {
+        guard let num = Double(peek.lexeme) else {
+            throw ParserError.invalidToken(peek)
+        }
+        return FloatVal(value: num)
+    }
+    
+    func parseBoolean() throws -> Expr {
+        return Boolean(value: peek.tokenType == .True)
+    }
+    
+    func parseString() throws -> Expr {
+        return StringVal(value: peek.lexeme)
+    }
+    
+    func parsePrefix() throws -> Expr {
+        let op = peek
+        advance()
+        
+        let right = try parseExpr(.lowest) 
+        
+        return Unary(op: op, right: right)
+    }
+    
+    func parseInfix(expr: Expr) throws -> Expr {
+        let op = prev
+        let prec = peek.tokenType.precedence
+        let right = try parseExpr(prec)
+        return Binary(left: expr, right: right, op: op)
+    }
+    
+    func parseGrouping() throws -> Expr {
+        advance()
+        let expr = try parseExpr(.lowest)
         return expr
     }
     
-    func comparison() throws -> Expr {
-        var left = try term()
-        
-        while match(types: [.LessThan, .LessThanEqual, .GreaterThan, .GreaterThanEqual, .EqualEqual, .BangEqual]) {
-            let op = prev
-            let right = try term()
-            left = Binary(left: left, right: right, op: op)
+    func parseIf() throws -> Expr {
+        advance()
+        let condition = try parseExpr(.lowest)
+        let thenBranch = try parseBlock()
+        var elseBranch: Block? = nil
+        if match(types: [.Else]) {
+            elseBranch = try parseBlock()
         }
-        
-        return left
+        return IfExpr(condition: condition, thenBranch: thenBranch, elseBranch: elseBranch)
     }
     
-    func term() throws -> Expr {
-        var left = try factor()
-        
-        while match(types: [.Plus, .Minus]) {
-            let op = prev
-            let right = try factor()
-            left = Binary(left: left, right: right, op: op)
+    func parseAssign(expr: Expr) throws -> Expr {
+        guard let ident = expr as? Identifier else {
+            throw ParserError.invalidToken(peek)
         }
-        
-        return left
-    }
-    
-    func factor() throws -> Expr {
-        var left = try unary()
-        
-        while match(types: [.Star, .Slash]) {
-            let op = prev
-            let right = try unary()
-            left = Binary(left: left, right: right, op: op)
-        }
-        
-        return left
-    }
-
-    func unary() throws -> Expr {
-        if match(types: [.Bang, .Minus]) {
-            let op = prev
-            let right = try unary()
-            return Unary(op: op, right: right)
-        }
-        
-        return try primary()
-    }
-    
-    func primary() throws -> Expr {
-        if match(types: [.True]) {
-            return Boolean(value: true)
-        }
-        if match(types: [.False]) {
-            return Boolean(value: false)
-        }
-        if match(types: [.Null]) {
-            return Null()
-        }
-        if match(types: [.String]) {
-            return StringVal(value: prev.lexeme)
-        }
-        if match(types: [.Float]) {
-            let token = prev
-            guard let value = Double(token.lexeme) else {
-                throw ParserError.invalidToken(prev)
-            }
-            return FloatVal(value: value)
-        }
-        if match(types: [.Integer]) {
-            let token = prev
-            guard let value = Int(token.lexeme) else {
-                throw ParserError.invalidToken(prev)
-            }
-            return Integer(value: Int(value))
-        }
-        
-        if match(types: [.Identifier]) {
-            return Var(name: prev.lexeme)
-        }
-        
-        if match(types: [.LeftParen]) {
-            let expr = try expression()
-            try consume(tokenType: .RightParen)
-            return expr
-        }
-        throw ParserError.invalidToken(peek)
+        let name = ident.name
+        let val = try parseExpr(.lowest)
+        return Assign(name: name, value: val)
     }
     
     @discardableResult
@@ -187,7 +222,7 @@ class Parser {
         return prev
     }
     
-    func match(types: [Token.TokenType]) -> Bool {
+    func match(types: [TokenType]) -> Bool {
         for tokenType in types {
             if check(tokenType: tokenType) {
                 advance()
@@ -197,13 +232,12 @@ class Parser {
         return false
     }
     
-    func check(tokenType: Token.TokenType) -> Bool {
-        if isAtEnd { return false }
-        return peek.type == tokenType
+    func check(tokenType: TokenType) -> Bool {
+        return peek.tokenType == tokenType
     }
     
     @discardableResult
-    func consume(tokenType: Token.TokenType) throws -> Token {
+    func consume(tokenType: TokenType) throws -> Token {
         guard check(tokenType: tokenType) else {
             throw ParserError.invalidToken(peek)
         }
