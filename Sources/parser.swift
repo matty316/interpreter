@@ -91,6 +91,7 @@ class Parser {
     
     func parseStmt() throws -> Stmt? {
         if match(types: [.Let]) { return try parseLet() }
+        if match(types: [.LeftBrace]) { return try parseBlock() }
         if match(types: [.Newline, .Semicolon]) { return nil }
         return try parseExpressionStmt()
     }
@@ -108,7 +109,6 @@ class Parser {
     
     func parseBlock() throws -> Block {
         var stmts = [Stmt]()
-        try consume(tokenType: .LeftBrace)
         
         while !check(tokenType: .RightBrace) && !isAtEnd {
             if let stmt = try parseStmt() {
@@ -199,9 +199,11 @@ class Parser {
     func parseIf() throws -> Expr {
         advance()
         let condition = try parseExpr(.lowest)
+        try consume(tokenType: .LeftBrace)
         let thenBranch = try parseBlock()
         var elseBranch: Block? = nil
         if match(types: [.Else]) {
+            try consume(tokenType: .LeftBrace)
             elseBranch = try parseBlock()
         }
         return IfExpr(condition: condition, thenBranch: thenBranch, elseBranch: elseBranch)

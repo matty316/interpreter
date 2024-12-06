@@ -27,6 +27,7 @@ class Evaluator {
         return last
     }
     
+    @discardableResult
     func evalStmt(_ stmt: Stmt) throws -> Any? {
         switch stmt {
         case let stmt as ExpressionStmt: return try evalExpession(stmt)
@@ -37,7 +38,7 @@ class Evaluator {
     }
     
     func evalIf(_ expr: IfExpr) throws -> Any? {
-        if (try isTruthy(expr.condition)) {
+        if try isTruthy(expr.condition) {
             return try evalStmt(expr.thenBranch)
         } else if let elseBranch = expr.elseBranch {
             return try evalStmt(elseBranch)
@@ -61,10 +62,10 @@ class Evaluator {
         let prev = env
         env = environment
         for stmt in stmt.stmts {
-            _ = try evalStmt(stmt)
+            try evalStmt(stmt)
         }
         env = prev
-        return nil
+        return stmt.stmts.last
     }
     
     func evalLetStmt(_ stmt: LetStmt) throws -> Any? {

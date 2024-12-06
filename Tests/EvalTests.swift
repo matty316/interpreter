@@ -118,9 +118,39 @@ struct EvalTests {
     }
     
     @Test(arguments: zip(["let variable = 2; variable = 3; variable"], [3]))
-    func parseAssign(source: String, exp: Int) async throws {
+    func assign(source: String, exp: Int) async throws {
         let res = try getResult(source: source)
         
         #expect(res as! Int == exp)
+    }
+    
+    @Test func testBlock() {
+        let source = """
+let variable = 12
+{
+    let variable = 13
+}
+variable
+"""
+        
+        let res = try! getResult(source: source) as! Int
+        #expect(res == 12)
+    }
+    
+    @Test(arguments: zip([
+        "if true { 2 }",
+        "if false { 2 }",
+        "if 1 < 2 { 3 }",
+        "if 1 > 2 { 3 }",
+        "if true { 2 } else { 3 }",
+        "if false { 2 } else { 3 }"
+    ],[2, nil, 3, nil, 2, 3])) func testEvalIf(input: String, exp: Int?) {
+        let res = try! getResult(source: input)
+        if let exp = exp {
+            let num = (res as! ExpressionStmt).expr as! Integer
+            #expect(num.value == exp)
+        } else {
+            #expect(res == nil)
+        }
     }
 }
