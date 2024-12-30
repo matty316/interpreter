@@ -73,6 +73,14 @@ struct EvalTests {
         ("2 != 2", false),
         ("\"hell yeah\" == \"hell yeah\"", true),
         ("\"hell yeah\" == \"hell no\"", false),
+        ("true && false", false),
+        ("true && true", true),
+        ("false && true", false),
+        ("false && false", false),
+        ("true || false", true),
+        ("true || true", true),
+        ("false || true", true),
+        ("false || false", false),
     ])
     func evalBoolExpressions(exp: (source: String, answer: Bool)) async throws {
         let scanner = Scanner(source: exp.source)
@@ -152,5 +160,29 @@ variable
         } else {
             #expect(res == nil)
         }
+    }
+    
+    @Test func testWhile() {
+        let source = """
+let i = 0
+while i < 10 {
+    i = i + 1
+}
+i
+"""
+        let res = try! getResult(source: source)
+        #expect(res as! Int == 10)
+    }
+    
+    @Test func testFor() {
+        let source = """
+let j = 0
+for let i = 0; i < 10; i = i + 1 {
+    j = j + 1
+}
+j
+"""
+        let res = try! getResult(source: source)
+        #expect(res as! Int == 10)
     }
 }

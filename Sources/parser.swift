@@ -11,6 +11,7 @@ enum ParserError: Error {
     case ifWithNoThenBranch
     case noPrefixParseFn(Token)
     case noInfixParseFn(Token)
+    case forWithNoInit
 }
 
 typealias PrefixParseFn = () throws -> Expr
@@ -75,6 +76,8 @@ class Parser {
         self.infixParseFns[.BangEqual] = parseInfix
         self.infixParseFns[.EqualEqual] = parseInfix
         self.infixParseFns[.Equal] = parseAssign
+        self.infixParseFns[.And] = parseInfix
+        self.infixParseFns[.Or] = parseInfix
 }
     
     func parse() throws -> Program {
@@ -92,6 +95,8 @@ class Parser {
     func parseStmt() throws -> Stmt? {
         if match(types: [.Let]) { return try parseLet() }
         if match(types: [.LeftBrace]) { return try parseBlock() }
+        if match(types: [.While]) { return try parseWhile() }
+        if match(types: [.For]) { return try parseFor() }
         if match(types: [.Newline, .Semicolon]) { return nil }
         return try parseExpressionStmt()
     }
@@ -105,6 +110,26 @@ class Parser {
         }
         
         return LetStmt(name: name.lexeme, initializer: initializer)
+    }
+    
+    func parseWhile() throws -> While {
+        let condition = try parseExpr(.lowest)
+        try consume(tokenType: .LeftBrace)
+        let body = try parseBlock()
+        return While(condition: condition, body: body)
+    }
+    
+    func parseFor() throws -> For {
+        guard let initializer = try parseStmt() else {
+            throw ParserError.forWithNoInit
+        }
+        try consume(tokenType: .Semicolon)
+        let condition = try parseExpr(.lowest)
+        try consume(tokenType: .Semicolon)
+        let increment = try parseExpr(.lowest)
+        try consume(tokenType: .LeftBrace)
+        let body = try parseBlock()
+        return For(initializer: initializer, condition: condition, increment: increment, body: body)
     }
     
     func parseBlock() throws -> Block {

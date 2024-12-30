@@ -32,6 +32,8 @@ class Evaluator {
         switch stmt {
         case let stmt as ExpressionStmt: return try evalExpession(stmt)
         case let stmt as LetStmt: return try evalLetStmt(stmt)
+        case let whileStmt as While: return try evalWhile(whileStmt)
+        case let forStmt as For: return try evalFor(forStmt)
         case let stmt as Block: return try evalBlock(stmt, environment: Env(enclosing: env))
         default: throw RuntimeError.General
         }
@@ -103,6 +105,11 @@ class Evaluator {
     
     func evalBinary(_ expr: Binary) throws -> Any {
         let op = expr.op
+        
+        if op.tokenType == .And || op.tokenType == .Or {
+            return try evalConditional(left: expr.left, right: expr.right, op: op)
+        }
+        
         let left = try evalExpr(expr.left)
         let right = try evalExpr(expr.right)
         
@@ -222,6 +229,24 @@ class Evaluator {
         throw RuntimeError.General
     }
     
+    func evalConditional(left: Expr, right: Expr, op: Token) throws -> Bool {
+        switch op.tokenType {
+        case .And:
+            if try !isTruthy(left) {
+                return false
+            }
+            
+            return try isTruthy(right)
+        case .Or:
+            if try isTruthy(left) {
+                return true
+            }
+            
+            return try isTruthy(right)
+        default: throw RuntimeError.InvalidOperand
+        }
+    }
+    
     func evalUnary(_ expr: Unary) throws -> Any {
         let op = expr.op
         let right = try evalExpr(expr.right)
@@ -238,5 +263,28 @@ class Evaluator {
         default: break
         }
         throw RuntimeError.General
+    }
+    
+    func evalWhile(_ whileStmt: While) throws -> Any? {
+        while try isTruthy(whileStmt.condition) {
+            try evalStmt(whileStmt.body)
+        }
+        return nil
+    }
+    
+    func evalFor(_ forStmt: For) throws -> Any? {
+        guard let initializer = forStmt.initializer as? LetStmt else {
+            throw RuntimeError.General
+        }
+        _ = try evalLetStmt(initializer)
+        while try isTruthy(forStmt.condition) {
+            try evalStmt(forStmt.body)
+            guard let assign = forStmt.increment as? Assign else {
+                throw RuntimeError.General
+            }
+            _ = try evalAssign(assign)
+        }
+        
+        return nil
     }
 }

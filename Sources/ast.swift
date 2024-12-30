@@ -79,3 +79,15 @@ struct Assign: Expr {
     let name: String
     let value: Expr
 }
+
+struct While: Stmt {
+    let condition: Expr
+    let body: Block
+}
+
+struct For: Stmt {
+    let initializer: Stmt
+    let condition: Expr
+    let increment: Expr
+    let body: Block
+}

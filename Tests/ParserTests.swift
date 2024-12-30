@@ -204,6 +204,8 @@ if 1 < 2 {
 10 * 5
 (10 + 5) * 7
 10 + 5 * 7
+true && false
+true || false
 """
         
         let scanner = Scanner(source: source)
@@ -219,9 +221,11 @@ if 1 < 2 {
             Binary(left: Integer(value: 10), right: Integer(value: 5), op: Token(type: .Star, lexeme: "*", line: 4)),
             Binary(left: Binary(left: Integer(value: 10), right: Integer(value: 5), op: getToken(TokenType: .Plus, line: 5)), right: Integer(value: 7), op: getToken(TokenType: .Star, line: 5)),
             Binary(left: Integer(value: 10), right: Binary(left: Integer(value: 5), right: Integer(value: 7), op: getToken(TokenType: .Star, line: 5)), op: getToken(TokenType: .Plus, line: 5)),
+            Binary(left: Boolean(value: true), right: Boolean(value: false), op: Token(type: .And)),
+            Binary(left: Boolean(value: true), right: Boolean(value: false), op: Token(type: .Or))
         ]
         
-        #expect(program.stmts.count == 7)
+        #expect(program.stmts.count == 9)
         for (i, expr) in expectedExpr.enumerated() {
             let testStmt = program.stmts[i]
             guard let testStmt = testStmt as? ExpressionStmt, let testExpr = testStmt.expr as? Binary else {
@@ -284,4 +288,33 @@ if 1 < 2 {
         #expect(val.value == 1)
     }
     
+    @Test func testWhile() {
+        let source = """
+while true {
+    "infinity"
+} 
+"""
+        let stmt = parse(input: source).first as! While
+        let exp = While(condition: Boolean(value: true), body: Block(stmts: [ExpressionStmt(expr: StringVal(value: "infinity"))]))
+        
+        let condition = stmt.condition as! Boolean
+        let expCondition = exp.condition as! Boolean
+        #expect(condition.value == expCondition.value)
+        
+        let body = (stmt.body.stmts.first as! ExpressionStmt).expr as! StringVal
+        let expBody = (exp.body.stmts.first as! ExpressionStmt).expr as! StringVal
+        #expect(body.value == expBody.value)
+    }
+    
+    @Test func testFor() {
+        let source = """
+for let i = 0; i < 10; i = i + 1 {
+    "increment"
+}
+"""
+        let stmt = parse(input: source).first as! For
+        let initializer = stmt.initializer as! LetStmt
+        let condition = stmt.condition as! Binary
+        let increment = stmt.increment as! Assign
+    }
 }

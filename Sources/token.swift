@@ -46,6 +46,8 @@ enum TokenType: String {
     case Comma = ","
     case Bang = "!"
     case BangEqual = "!="
+    case And = "&&"
+    case Or = "||"
     case Integer
     case Float
     case String

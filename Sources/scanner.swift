@@ -50,7 +50,7 @@ class Scanner {
         addToken(type: .Eof)
     }
     
-    func scanToken() throws {
+    func scanToken() throws(ScannerError) {
         start = position
         let c = advance()
         
@@ -102,6 +102,20 @@ class Scanner {
                 advance()
             } else {
                 addToken(type: .Bang)
+            }
+        case "&":
+            if peek == "&" {
+                addToken(type: .And)
+                advance()
+            } else {
+                throw .invalidCharacter
+            }
+        case "|":
+            if peek == "|" {
+                addToken(type: .Or)
+                advance()
+            } else {
+                throw .invalidCharacter
             }
         case "\"": try string()
         case " ", "\r", "\t": break
@@ -180,7 +194,7 @@ class Scanner {
         }
     }
     
-    func string() throws {
+    func string() throws(ScannerError) {
         while peek != "\"" && !isAtEnd {
             if peek == "\n" {
                 line += 1

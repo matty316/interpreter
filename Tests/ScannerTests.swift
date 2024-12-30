@@ -37,11 +37,11 @@ struct ScannerTests {
     @Test func scanMultiToken() async throws {
         let source = """
 == <= >= // this is a comment
-!= = = < = > = / /
+!= = = < = > = / / && ||
 """
         let scanner = Scanner(source: source)
         try scanner.scan()
-        #expect(scanner.tokens.count == 15)
+        #expect(scanner.tokens.count == 17)
         #expect(scanner.tokens[0].tokenType == .EqualEqual)
         #expect(scanner.tokens[1].tokenType == .LessThanEqual)
         #expect(scanner.tokens[2].tokenType == .GreaterThanEqual)
@@ -56,7 +56,9 @@ struct ScannerTests {
         #expect(scanner.tokens[11].tokenType == .Equal)
         #expect(scanner.tokens[12].tokenType == .Slash)
         #expect(scanner.tokens[13].tokenType == .Slash)
-        #expect(scanner.tokens[14].tokenType == .Eof)
+        #expect(scanner.tokens[14].tokenType == .And)
+        #expect(scanner.tokens[15].tokenType == .Or)
+        #expect(scanner.tokens[16].tokenType == .Eof)
     }
     
     @Test func scanIdentifier() async throws {
